@@ -1,10 +1,39 @@
 (ns alda.sound.midi
   (:require [taoensso.timbre :as log])
-  (:import  (javax.sound.midi MidiSystem Synthesizer MidiChannel)))
+  (:import (java.util.concurrent LinkedBlockingQueue)
+           (javax.sound.midi MidiSystem Synthesizer MidiChannel)))
 
 (comment
   "There are 16 channels per MIDI synth (1-16);
    channel 10 is reserved for percussion.")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(comment
+  "It takes a second to initialize a MIDI synth. To avoid hiccups and make
+   playback more immediate, we maintain a handful of pre-initialized MIDI
+   synths, ready for immediate use.")
+
+(defn new-midi-synth
+  []
+  (doto ^Synthesizer (MidiSystem/getSynthesizer) .open))
+
+(def ^:dynamic *midi-synth-pool* (LinkedBlockingQueue.))
+
+(def ^:const MIDI-SYNTH-POOL-SIZE 4)
+
+(defn fill-pool!
+  []
+  (log/infof "Filling synth pool... (max size: %d)" MIDI-SYNTH-POOL-SIZE)
+  (dotimes [_ (- MIDI-SYNTH-POOL-SIZE (count *midi-synth-pool*))]
+    (future (.add *midi-synth-pool* (new-midi-synth)))))
+
+(defn get-midi-synth
+  []
+  (fill-pool!)
+  (.take *midi-synth-pool*))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- next-available
   "Given a set of available MIDI channels, returns the next available one,
