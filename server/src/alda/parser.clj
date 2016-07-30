@@ -82,8 +82,9 @@
 
 (defn apply-plugins
   [[input cache]]
-  (load "plugins")
-  [((resolve 'apply-clojure-plugin) input) cache])
+  (let [plugin-file-path (str (System/getenv "HOME") "/.alda/plugins.clj")]
+    (load-file plugin-file-path)
+    [((resolve 'apply-clojure-plugin) input) cache]))
 
 (defn remove-comments
   "Strips comments from a string of Alda code.
